@@ -42,3 +42,10 @@ store.subscribe(() => {
   document.getElementById("point").textContent = points;
 });
 
+// 測試 isDispatching
+const unsbscribe1 = store.subscribe(() => console.log("unsbscribe1"));
+const unsbscribe2 = store.subscribe(() => {
+  unsbscribe1();
+  console.log("unsbscribe2");
+  const unsbscribe3 = store.subscribe(() => console.log("unsbscribe3"));
+});

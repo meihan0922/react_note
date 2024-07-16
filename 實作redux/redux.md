@@ -13,4 +13,4 @@
   2. reducer init，定義修改 store 規則
   3. getState (getter)：取當前 store
   4. dispatch (setter)：傳入 action 修改 store
-  5. subscribe，定義訂閱 store 要做的事情：傳入 callback 在 store 更新時回調
+  5. subscribe，定義訂閱 store 要做的事情：傳入 callback 在 store 更新時回調，回傳 取消訂閱的 callback，要注意回調時，不應操作 store 本身
