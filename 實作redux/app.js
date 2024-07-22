@@ -2,15 +2,29 @@ import { applyMiddleware } from "./applyMiddleware.js";
 import { createStore } from "./createStore.js";
 import { catchErrMiddleware, loggerMiddleware } from "./Middlewares";
 
-const reducer = (state, action) => {
+const pointsReducer = (state = preloadedState.points, action) => {
   switch (action.type) {
     case "PLUS_POINTS":
-      return {
-        points: state.points + action.payload,
-      };
+      return state.points + action.payload;
     case "MINUS_POINTS":
+      return state.points - action.payload;
+    default:
+      return state;
+  }
+};
+
+// userReducer 規範 user 的更新
+const userReducer = (state = preloadedState.user, action) => {
+  switch (action.type) {
+    case "UPDATE_NAME":
       return {
-        points: state.points - action.payload,
+        ...state,
+        name: action.name,
+      };
+    case "UPDATE_AGE":
+      return {
+        ...state,
+        age: action.age,
       };
     default:
       return state;
@@ -19,9 +33,17 @@ const reducer = (state, action) => {
 
 const defaultState = {
   points: 0,
+  user: {
+    name: "mmmm",
+    age: 18,
+  },
 };
 document.getElementById("point").textContent = defaultState.points;
 
+const reducer = combineReducers({
+  points: pointsReducer,
+  user: userReducer,
+});
 const enhancer = applyMiddleware([loggerMiddleware, catchErrMiddleware]);
 const store = createStore(defaultState, reducer, enhancer);
 
