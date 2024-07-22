@@ -1,6 +1,11 @@
-// preloadedState: 初始化狀態
-function createStore(preloadedState, reducers) {
-  let currentState = preloadedState,
+// defaultState: 初始化狀態
+function createStore(defaultState, reducers, enhancer) {
+  if (enhancer) {
+    // 修改 dispatch ，讓他包裹 middlewares
+    const newCreateStore = enhancer(createStore);
+    return newCreateStore(reducers, enhancer);
+  }
+  let currentState = defaultState,
     /** 所有放入 listener 的 id */
     listenIdCounter = 0,
     /** 用 map 來紀錄放入的 listener，都是獨一無二的 */
@@ -30,16 +35,14 @@ function createStore(preloadedState, reducers) {
     } finally {
       isDispatching = false;
     }
-
     currentListeners.forEach((l) => l());
   }
 
   function subscribe(listeners) {
     const newListenerId = listenIdCounter++;
     currentListeners.set(newListenerId, listeners);
-    return () => {
-      currentListeners.delete(newListenerId);
-    };
+
+    return () => currentListeners.delete(newListenerId);
   }
 
   return { getState, dispatch, subscribe };

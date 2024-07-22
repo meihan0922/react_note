@@ -1,4 +1,6 @@
+import { applyMiddleware } from "./applyMiddleware.js";
 import { createStore } from "./createStore.js";
+import { catchErrMiddleware, loggerMiddleware } from "./Middlewares";
 
 const reducer = (state, action) => {
   switch (action.type) {
@@ -15,13 +17,13 @@ const reducer = (state, action) => {
   }
 };
 
-const preloadedState = {
+const defaultState = {
   points: 0,
 };
+document.getElementById("point").textContent = defaultState.points;
 
-document.getElementById("point").textContent = preloadedState.points;
-
-const store = createStore(preloadedState, reducer);
+const enhancer = applyMiddleware([loggerMiddleware, catchErrMiddleware]);
+const store = createStore(defaultState, reducer, enhancer);
 
 document.getElementById("plus").addEventListener("click", () => {
   store.dispatch({
@@ -43,9 +45,9 @@ store.subscribe(() => {
 });
 
 // 測試 isDispatching
-const unsbscribe1 = store.subscribe(() => console.log("unsbscribe1"));
-const unsbscribe2 = store.subscribe(() => {
-  unsbscribe1();
-  console.log("unsbscribe2");
-  const unsbscribe3 = store.subscribe(() => console.log("unsbscribe3"));
-});
+// const unsbscribe1 = store.subscribe(() => console.log("unsbscribe1"));
+// const unsbscribe2 = store.subscribe(() => {
+//   unsbscribe1();
+//   console.log("unsbscribe2");
+//   const unsbscribe3 = store.subscribe(() => console.log("unsbscribe3"));
+// });
