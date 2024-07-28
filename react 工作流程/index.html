@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <style>
+    #root {
+      width: 100px;
+      height: 100px;
+      background: #000;
+    }
+  </style>
+  <body>
+    <div id="root"></div>
+  </body>
+  <script>
+    /**
+    let start;
+    let root = document.getElementById("root");
+    function animate(timestart) {
+      console.log(timestart);
+      if (!start) {
+        start = timestart;
+      }
+      console.log("ttttt", timestart, timestart - start);
+      root.style.transform = `translate(${+timestart * 0.1}px)`;
+      if (timestart < 2000) {
+        window.requestAnimationFrame(animate);
+      }
+    }
+    window.requestAnimationFrame(animate);
+    **/
+    /**
+    // requestIdleCallback：在主要任務執行完後有空閒時間就可以執行
+    // 可執行低優先的任務
+    function sleep(duration) {
+      let now = Date.now();
+      while (duration + now > Date.now()) {
+        return;
+      }
+    }
+    // 空閒時回調
+    let works = [
+      () => {
+        console.log("task 1");
+        sleep(300);
+      },
+      () => {
+        console.log("task 2");
+        sleep(300);
+      },
+      () => {
+        console.log("task 3");
+      },
+      () => {
+        console.log("task 4");
+      },
+      () => {
+        console.log("task 5");
+      },
+    ];
+    function runWorks() {
+      let w = works.shift();
+      w();
+    }
+    function progress(deadline) {
+      // 如果有剩餘時間就執行任務
+      // 實例方法：https://developer.mozilla.org/zh-CN/docs/Web/API/IdleDeadline
+      // IdleDeadline.timeRemaining()
+      let remaining = deadline.timeRemaining();
+      console.log("剩下多少時間：", remaining);
+      if (remaining > 0 && works.length > 0) {
+        runWorks();
+      }
+      if (works.length > 0) {
+        window.requestIdleCallback(progress);
+      }
+    }
+    window.requestIdleCallback(progress);
+  **/
+    /**
+     * 剩下多少時間： 11.7
+       task 1
+       剩下多少時間： 12.6
+       task 2
+       剩下多少時間： 9.3
+       task 3
+       剩下多少時間： 49.9 // 為何會變成 49ms??
+       task 4
+       剩下多少時間： 49.9
+       task 5
+
+       如果執行的任務較少，瀏覽器會把一幀的時間拉長，
+       讓頁面不用頻繁的更新，可以處理更多不重要的程式碼 requestIdleCallback，
+       但用戶在變成100ms以上才會感受到變慢
+     * **/
+    // let channel = new MessageChannel();
+    // let port1 = channel.port1;
+    // let port2 = channel.port2;
+    // port1.onmessage = function (e) {
+    //   console.log("port1.onmessage", e.data);
+    // };
+    // port2.onmessage = function (e) {
+    //   console.log("port2.onmessage", e.data);
+    // };
+    // port1.postMessage("post1");
+    // port2.postMessage("post2");
+    /****/
+    const channel = new MessageChannel();
+    let callback;
+    const port1 = channel.port1;
+    const port2 = channel.port2;
+    port2.onmessage = function ({ data: { deadTime } }) {
+      const currentTime = performance.now();
+      const didTimeout = deadTime <= currentTime;
+      // 如果還有時間的話就去執行 callback
+      if (!didTimeout && callback) {
+        callback({ didTimeout, timeRemaining: currentTime - deadTime });
+      }
+    };
+    window.requestIdleCallbackPolyfill = function (callback, options) {
+      window.requestAnimationFrame((raftime) => {
+        console.log(raftime);
+        port1.postMessage({
+          // 發一個宏任務
+          deadTime: raftime + 16.6, // 假設現在更新頻率是 16.6
+        });
+        callback = callback;
+      });
+    };
+  </script>
+</html>

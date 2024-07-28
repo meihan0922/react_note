@@ -13,7 +13,7 @@
     - [useDeferredValue](#usedeferredvalue)
     - [useId](#useid)
     - [library hooks](#library-hooks)
-      - [useSyncExternalStore(subscribe, getSnapshot,)](#usesyncexternalstoresubscribe-getsnapshot)
+      - [useSyncExternalStore(subscribe, getSnapshot,getServerSnapshot?): store Snapshot](#usesyncexternalstoresubscribe-getsnapshotgetserversnapshot-store-snapshot)
       - [useInsertionEffect - CSS-in-JS](#useinsertioneffect---css-in-js)
 
 # React 18
@@ -394,9 +394,55 @@ console.log(3);
 
 開發者需要搭配某些套件使用，主要用湖深度融合 套件開發。
 
-#### useSyncExternalStore(subscribe, getSnapshot,)
+#### [useSyncExternalStore(subscribe, getSnapshot,getServerSnapshot?): store Snapshot](https://zh-hans.react.dev/reference/react/useSyncExternalStore)
 
 解決的是並發模式下資料流管理的問題，它提供了一種方法，確保即使在並發更新的情況下，元件也可以同步地從外部儲存中獲取資料。
+在 zustand 當中就有用到！
+
+- `subscribe`: 自定義的監聽器，接收一個 callback，當 store 發生變化時，會回調這個 callback，回傳的 listener 是 react 發現值改變渲染，可以把它當作 setState。也就是 ==callback 訂閱 store 的變更，讓組件重新渲染。== 回傳清除訂閱的函式。
+- `getSnapshot`: 接收一個 callback，返回組件需要的 store 的快照。用 `Object.is()` 比較，如果 store 不變，則回傳一樣的值。
+  - 對應到 zustand 的 getState
+- `getServerSnapshot`: 用在服務端渲染和客戶端 hydration 時用到，返回數據快照，這個快照必須在客戶端與服務端相同。
+
+```js
+const Test(){
+  const width = useSyncExternalStore((listener)=>{
+    // resize 就回調渲染
+    window.addEventListener("resize", listener)
+    return ()=> window.removeEventListener("resize", listener)
+  }, ()=> window.innerWidth)
+
+  return <p>Size: {width}</p>
+}
+```
+
+自定義 store 的寫法
+
+```js
+let listeners = [];
+export const todosStore = {
+  addTodo() {
+    todos = [...todos, { id: nextId++, text: "Todo #" + nextId }];
+    emitChange();
+  },
+  subscribe(listener) {
+    // 這邊
+    listeners = [...listeners, listener];
+    return () => {
+      listeners = listeners.filter((l) => l !== listener);
+    };
+  },
+  getSnapshot() {
+    return todos;
+  },
+};
+
+function emitChange() {
+  for (let listener of listeners) {
+    listener();
+  }
+}
+```
 
 #### useInsertionEffect - CSS-in-JS
 
