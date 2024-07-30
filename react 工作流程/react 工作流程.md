@@ -349,27 +349,8 @@ Effect 又分很多類型
 3. 不同更新的優先級：比方高優先級的輸入事件、低優先級的網路請求
 4. 併發模式：可終止高消耗非緊急的渲染
 
-```mermaid
-flowchart LR
-subgraph browser 執行序
-    Browser[瀏覽器] -.-... -.-
-   newLines["事件處理
-      JS 執行
-      Layout/ Render
-      空閑時間"] -.- Task[瀏覽器任務]
-end
-subgraph react 背後運行
-   React -.- A[調度請求]
-   A --> ...
-   A -.- ReactTask[執行任務]
-   ReactTask --> B{有下個任務嗎?}
-    B -- 是 --> C
-    B -- 否 --> Task
-    C{還有剩下時間?}
-    C -- 否 --> Task
-    C -- 是 --> B
-end
-```
+![browser](./assets/browser.webp)
+![real](./assets/real.webp)
 
 ##### window.requestAnimationFrame & window.requestIdleCallback
 
@@ -551,81 +532,177 @@ React 為什麼選擇使用 MessageChannel 來實現類似 requestIdleCallback �
    - 如果也完成，則 `nextUnitWork` 指向節點的 return
 6. render 階段完成，準備進入 commit 階段
 
-```js
- //   <div id="A1">
-    //     <div id="B1">
-    //       <div id="C1"></div>
-    //       <div id="C2"></div>
-    //     </div>
-    //     <div id="B2"></div>
-    //   </div>
-
-   let A1 = { type: 'div', key: 'A1' };
-   let B1 = { type: 'div', key: 'B1', return: A1 };
-   let B2 = { type: 'div', key: 'B2', return: A1 };
-   let C1 = { type: 'div', key: 'C1', return: B1 };
-   let C2 = { type: 'div', key: 'C2', return: B1 };
-   A1.child = B1;
-   B1.sibling = B2;
-   B1.child = C1;
-   C1.sibling = C2;
-   // 根fiber
-   const rootFiber = A1;
-
-
-    let workInProgressRoot = rootFiber;
-    // 下一個要處理的單元
-    let nextUnitWork = workInProgressRoot;
-    // 工作循環
-    function workloop(deadline) {
-      // 2. 開始工作！
-      // 如果當前處理的節點存在，而且還有剩餘的時間
-      // 就去構建 下一個 fiber node
-      // 上圖綠色線條
-      while (nextUnitWork && deadline.timeRemaing() > 0) {
-        nextUnitWork = performUnitWork(nextUnitWork);
-      }
-      // 5. 如果沒有下一個節點了，進入第二階段 commit
-      // 上圖的藍色線
-      if (!nextUnitWork) {
-        commitRoot();
-      }
-    }
-    // 構建 fiber tree
-    function performUnitWork(workInProgressFiber) {
-      // 4. 創建 dom節點
-      startWork(fiber);
-      // 如果有子節點優先處理子節點，以『深度優先』
-      if (fiber.child) {
-        return fiber.child;
-      }
-      // 如果沒有子節點
-      while (fiber) {
-        // 5. 此節點已經完成
-        completeUnitOfWork(fiber); //可以结束此fiber的渲染了
-        // 檢查是否有兄弟節點
-        if (fiber.sibling) {
-          return fiber.sibling;
-        }
-        fiber = fiber.return; // 回到父層級，再去找父的兄弟節點
-      }
-    }
-    function startWork(deadline) {
-      // 4. 創件 dom
-      console.log("beginWork", fiber.key);
-      //fiber.stateNode = document.createElement(fiber.type);
-    }
-   function completeUnitOfWork(fiber) {
-      // 5.
-      console.log('completeUnitOfWork', fiber.key);
-   }
-    // 1. 請求瀏覽器分配時間 requestIdleCallback，只要有時間就會去執行 workloop;
-    requestIdleCallback(workLoop, { timeout: 1000 });
-  </script>
-```
-
 ###### commit 階段 - 收集 Effect List
 
 1. 將待有副作用的 fiber node 節點收集起來，形成一個單鏈表。
 2. 通過 commitWork 方法，將收集的副作用進行提交，修改真實的 dom
 3. Effect List 的順序和 fiber 節點遍歷的完成順序一致
+   ![effect](./assets/image.png)
+   ![collect](./assets/collect.webp)
+
+```js
+//   <div id="A1">
+//     <div id="B1">
+//       <div id="C1"></div>
+//       <div id="C2"></div>
+//     </div>
+//     <div id="B2"></div>
+//   </div>
+
+let container = document.getElementById("root");
+let C1 = { type: "div", key: "C1", props: { id: "C1", children: [] } };
+let C2 = { type: "div", key: "C2", props: { id: "C2", children: [] } };
+let B1 = {
+  type: "div",
+  key: "B1",
+  props: { id: "B1", children: [C1, C2] },
+};
+let B2 = { type: "div", key: "B2", props: { id: "B2", children: [] } };
+let A1 = {
+  type: "div",
+  key: "A1",
+  props: { id: "A1", children: [B1, B2] },
+};
+
+let workInProgressRoot = {
+  key: "ROOT",
+  /**
+   * 節點實例，
+   * 對於root來說，這裡保留dom節點
+   * 對於class組件來說，保留class實例
+   * 對於函式組件來說，是空的，因為沒有實例
+   *  */
+  stateNode: container,
+  props: { children: [A1] },
+};
+// 下一個要處理的單元
+let nextUnitWork = workInProgressRoot;
+// 對應 diff 結果是要替換
+const PLACEMEMT = "PLACEMEMT";
+// 工作循環
+function workLoop(deadline) {
+  // 2. 開始工作！
+  // 如果當前處理的節點存在，而且還有剩餘的時間
+  // 就去構建 下一個 fiber node
+  console.log(nextUnitWork);
+  while (nextUnitWork && deadline.timeRemaining() > 0) {
+    nextUnitWork = performUnitWork(nextUnitWork);
+  }
+  // 5. 如果沒有下一個節點了，進入第二階段 commit
+  // 上圖的藍色線
+  if (!nextUnitWork && workInProgressRoot) {
+    commitRoot();
+  }
+  // 繼續下一幀的調度任務
+  // requestIdleCallback(workLoop, { timeout: 500 });
+}
+
+function completeUnitOfWork(currentFiber) {
+  const returnFiber = currentFiber.return;
+  if (returnFiber) {
+    if (!returnFiber.firstEffect) {
+      returnFiber.firstEffect = currentFiber.firstEffect;
+    }
+    if (currentFiber.lastEffect) {
+      if (returnFiber.lastEffect) {
+        returnFiber.lastEffect.nextEffect = currentFiber.firstEffect;
+      }
+      returnFiber.lastEffect = currentFiber.lastEffect;
+    }
+
+    if (currentFiber.effectTag) {
+      if (returnFiber.lastEffect) {
+        if (currentFiber.key === "B1") {
+          console.log(
+            "returnFiber.returnFiber.lastEffect",
+            returnFiber.lastEffect.key
+          );
+          console.log("returnFiber.firstEffect", returnFiber.lastEffect);
+        }
+        returnFiber.lastEffect.nextEffect = currentFiber;
+      } else {
+        returnFiber.firstEffect = currentFiber;
+      }
+      returnFiber.lastEffect = currentFiber;
+    }
+  }
+}
+// 構建 fiber tree
+function performUnitWork(fiber) {
+  // 4. 創建 dom節點
+  startWork(fiber);
+  // 如果有子節點優先處理子節點，以『深度優先』
+  if (fiber.child) {
+    return fiber.child;
+  }
+  // 如果沒有子節點
+  while (fiber) {
+    // 此節點已經完成
+    completeUnitOfWork(fiber); // 收集effect
+    // 檢查是否有兄弟節點
+    if (fiber.sibling) {
+      return fiber.sibling;
+    }
+    fiber = fiber.return; // 回到父層級，再去找父的兄弟節點
+  }
+}
+function startWork(currentFiber) {
+  // console.log("childFiber", currentFiber);
+  if (!currentFiber.stateNode) {
+    currentFiber.stateNode = document.createElement(currentFiber.type); //创建真实DOM
+    for (let key in currentFiber.props) {
+      //循环属性赋赋值给真实DOM
+      if (key !== "children" && key !== "key")
+        currentFiber.stateNode.setAttribute(key, currentFiber.props[key]);
+    }
+    console.log("currentFiber", currentFiber);
+  }
+
+  let previousFiber;
+  // 创建子fiber
+  currentFiber.props.children.forEach((child, index) => {
+    let childFiber = {
+      tag: "HOST",
+      type: child.type,
+      key: child.key,
+      props: child.props,
+      return: currentFiber,
+      effectTag: "PLACEMENT",
+      nextEffect: null,
+    };
+    if (index === 0) {
+      currentFiber.child = childFiber;
+    } else {
+      previousFiber.sibling = childFiber;
+    }
+    previousFiber = childFiber;
+  });
+}
+function commitRoot() {
+  let fiber = workInProgressRoot.firstEffect;
+  while (fiber) {
+    console.log(fiber.key); //C1 C2 B1 B2 A1
+    commitWork(fiber);
+    fiber = fiber.nextEffect;
+  }
+  workInProgressRoot = null;
+}
+function commitWork(currentFiber) {
+  currentFiber.return.stateNode.appendChild(currentFiber.stateNode);
+}
+
+// 1. 請求瀏覽器分配時間 requestIdleCallback，只要有時間就會去執行 workloop;
+requestIdleCallback(workLoop, { timeout: 1000 });
+```
+
+---
+
+> 學習資料：
+>
+> [React Fiber 原理](https://juejin.cn/post/6962449722275528712)
+>
+> [由淺入深 React 的 Fiber 架構](https://segmentfault.com/a/1190000022960789#item-6-13)
+>
+> [手撕 React Fiber 源码](https://www.bilibili.com/video/BV1vP4y1w7TN/?share_source=copy_web&vd_source=34ac1b8e3ce252ba440c815f2d4f6cd3)
+>
+> [利用 react scheduler 思想，实现任务的打断与恢复](https://juejin.cn/post/7345746216150417446)
