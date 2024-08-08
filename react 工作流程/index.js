@@ -23,8 +23,7 @@ function shouldYieldToHost() {
 }
 
 const performWorkUntilDeadline = () => {
-  const currentTime = getCurrentTime();
-  startTime = currentTime;
+  startTime = getCurrentTime();
   const hasTimeRemaining = true; // 有剩余时间
 
   let hasMoreWork = true;

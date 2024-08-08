@@ -1,39 +1,64 @@
 - [react 工作流程](#react-工作流程)
-    - [從 react element 到 fiber tree](#從-react-element-到-fiber-tree)
-    - [更新的本質](#更新的本質)
-    - [工作過程](#工作過程)
-      - [雙緩存 fiber tree](#雙緩存-fiber-tree)
-      - [創建更新 tree](#創建更新-tree)
-    - [調和 Reconcile](#調和-reconcile)
-    - [diff 算法](#diff-算法)
-      - [核心思想](#核心思想)
-      - [比較過程](#比較過程)
-        - [情況 1 - before: 列表，after: 單節點](#情況-1---before-列表after-單節點)
-        - [情況 2 - before: 列表，after: 列表](#情況-2---before-列表after-列表)
-          - [🌰 為 type 都一致的情況，只有 key 不同的情況](#-為-type-都一致的情況只有-key-不同的情況)
-          - [🌰 key 沒有設置或不同的情況](#-key-沒有設置或不同的情況)
-      - [判斷新建的節點，是否有變化](#判斷新建的節點是否有變化)
-      - [發生變化後要如何更新？](#發生變化後要如何更新)
-    - [Effect](#effect)
-    - [Fiber](#fiber)
-      - [所以 fiber 是什麼？](#所以-fiber-是什麼)
-        - [特性](#特性)
-        - [window.requestAnimationFrame \& window.requestIdleCallback](#windowrequestanimationframe--windowrequestidlecallback)
-          - [react 沒有用 requestIdleCallback？](#react-沒有用-requestidlecallback)
-          - [為什麼不能用 setTimeout 來代替 MessageChannel？不是都是呼叫執行宏任務嗎？](#為什麼不能用-settimeout-來代替-messagechannel不是都是呼叫執行宏任務嗎)
-        - [實際模擬過程](#實際模擬過程)
-          - [遍歷順序和 render 階段](#遍歷順序和-render-階段)
-          - [commit 階段 - 收集 Effect List](#commit-階段---收集-effect-list)
+  - [react 的架構](#react-的架構)
+    - [調度層 Scheduler](#調度層-scheduler)
+    - [協調層 Reconciler](#協調層-reconciler)
+    - [渲染層 Renderer](#渲染層-renderer)
+  - [從 react element 到 fiber tree](#從-react-element-到-fiber-tree)
+  - [更新的本質](#更新的本質)
+  - [工作過程](#工作過程)
+    - [雙緩存 fiber tree](#雙緩存-fiber-tree)
+    - [創建更新 tree](#創建更新-tree)
+  - [調和 Reconcile](#調和-reconcile)
+  - [diff 算法](#diff-算法)
+    - [核心思想](#核心思想)
+    - [比較過程](#比較過程)
+      - [情況 1 - before: 列表，after: 單節點](#情況-1---before-列表after-單節點)
+      - [情況 2 - before: 列表，after: 列表](#情況-2---before-列表after-列表)
+        - [🌰 為 type 都一致的情況，只有 key 不同的情況](#-為-type-都一致的情況只有-key-不同的情況)
+        - [🌰 key 沒有設置或不同的情況](#-key-沒有設置或不同的情況)
+    - [判斷新建的節點，是否有變化](#判斷新建的節點是否有變化)
+    - [發生變化後要如何更新？](#發生變化後要如何更新)
+  - [Effect](#effect)
+  - [Fiber](#fiber)
+    - [所以 fiber 是什麼？](#所以-fiber-是什麼)
+      - [特性](#特性)
+      - [window.requestAnimationFrame \& window.requestIdleCallback](#windowrequestanimationframe--windowrequestidlecallback)
+        - [react 沒有用 requestIdleCallback？](#react-沒有用-requestidlecallback)
+        - [為什麼不能用 setTimeout 來代替 MessageChannel？不是都是呼叫執行宏任務嗎？](#為什麼不能用-settimeout-來代替-messagechannel不是都是呼叫執行宏任務嗎)
+      - [實際模擬過程](#實際模擬過程)
+        - [遍歷順序和 render 階段](#遍歷順序和-render-階段)
+        - [commit 階段 - 收集 Effect List](#commit-階段---收集-effect-list)
 
 # react 工作流程
 
 重點整理：
 
 1. babel 轉譯 jsx -> createElement() -> react element -> fiber tree -> dom tree
-2. 更新發生調和 同時存在兩顆樹，新的樹會取代舊的樹，發生變化的 node 會標記 effect ，調和完成後 以單鏈表的結構收集，順序為子節點、子節點兄弟節點、父節點
+2. 更新發生調和 同時存在兩顆樹，新的樹會取代舊的樹，發生變化的 node 會標記 effect ，v17 之前調和完成後 以單鏈表的結構收集，順序為子節點、子節點兄弟節點、父節點，但性能問題加上內存管理不好，就使用一種新的數據結構 effectList 雙向鏈表來標記
 3. 如果組件沒有執行 render，就是直接複用舊樹節點，除此之外要經過 diff 算法 來判斷是要克隆還是創建
 4. diff 算法是比較已經匹配的父節點的子節點，不會跨父節點比較
 5. diff 算法如果 key 和 type 相同則克隆，不然就重新創建
+
+### react 的架構
+
+在 v16 版本中就開始分為三層：調度層、協調層、渲染層
+
+- **調度層 Scheduler** : 調度任務的優先級，高優先級的優先進入協調層
+- **協調層 Reconciler** : 構建 fiber tree，diff 比對，找出差異，標記 fiber node 準備要進行的 dom 操作
+- **渲染層 Renderer** : 負責將發生變化的部分渲染到頁面上
+
+#### 調度層 Scheduler
+
+v15 原先用遞歸進行 vd 的比對，中間是同步進行，無法中斷，長期佔用主線程，會導致畫面無法交互或是掉幀的狀況。v16 之後採用 循環模擬遞歸，並且利用瀏覽器空閑時間處理。原先 react 想利用 `requestIdleCallback` 但最終支援度和觸發頻率不穩定等問題，改官方自身實現任務調度，這個庫就叫做 Scheduler。可以實現瀏覽器空閒時執行任務，還可以調度任務的優先級，高優先級的優先進入協調層。
+
+#### 協調層 Reconciler
+
+v15 原先協調器和渲染器交替工作，找出差異就更新。v16 中，協調器緊緊只是找出差異後標記，之後交給渲染器更新。
+
+#### 渲染層 Renderer
+
+渲染器根據協調器在 fiber node 打上的標記，同步執行對應的 dom 操作。
+要注意的是，調度層和協調層是在內存中處理，所以可以被打斷，但渲染器被設定不可中斷。
 
 ### 從 react element 到 fiber tree
 
@@ -185,9 +210,13 @@ react 內部將一次更新分為兩個階段，**render**、**commit**。
 
 #### 雙緩存 fiber tree
 
+在內存當中構建，完成後替換上一幀，比在渲染時才構建要快！這個技術就叫做雙緩存。
+
 - `current fiber tree`: 當前螢幕顯示的樹
 - `workInProgress fiber tree`: 更新產生的樹。
   更新完成後 `workInProgress fiber tree` 會取代 `current fiber tree`。
+- alternate: 這個指針存在兩棵樹上，指向彼此，如果要更新，會替換掉舊的樹。
+- flags: 標記更新的內容，比方刪除更新插入等等的變化。
 
 #### 創建更新 tree
 
@@ -321,7 +350,7 @@ Effect 又分很多類型
 - Layout: 先執行 useEffect 返回的 destory 再同步執行 useEffect callback
   ...
 
-在調和完成後，會收將被標記 Effect 的 fiber node 收集成一個單鏈表結構，通過 nextEffect 指針連接，由最下層的子節點開始收集。
+v17：在調和完成後，會收將被標記 Effect 的 fiber node 收集成一個單鏈表結構，通過 nextEffect 指針連接，由最下層的子節點開始收集。
 收集完成後，分三階段處理：
 
 1. dom 操作之前， before mutation
@@ -335,6 +364,9 @@ Effect 又分很多類型
    - ref.current 初始化
    - useLayoutEffect
    - ...
+
+v18：以雙向鏈表來存儲，每個節點包含了要執行的副作用和對應的清理函數
+// TODO: 待補充
 
 ### Fiber
 
