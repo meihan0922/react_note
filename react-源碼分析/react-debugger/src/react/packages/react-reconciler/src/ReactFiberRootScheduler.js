@@ -4,14 +4,10 @@
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  *
- *      
+ *
  */
 
-                                                    
-                                           
-                                                                     
-
-import {enableDeferRootSchedulingToMicrotask} from 'shared/ReactFeatureFlags';
+import { enableDeferRootSchedulingToMicrotask } from "shared/ReactFeatureFlags";
 import {
   NoLane,
   NoLanes,
@@ -23,7 +19,7 @@ import {
   markRootEntangled,
   mergeLanes,
   claimNextTransitionLane,
-} from './ReactFiberLane';
+} from "./ReactFiberLane";
 import {
   CommitContext,
   NoContext,
@@ -34,8 +30,8 @@ import {
   isWorkLoopSuspendedOnData,
   performConcurrentWorkOnRoot,
   performSyncWorkOnRoot,
-} from './ReactFiberWorkLoop';
-import {LegacyRoot} from './ReactRootTags';
+} from "./ReactFiberWorkLoop";
+import { LegacyRoot } from "./ReactRootTags";
 import {
   ImmediatePriority as ImmediateSchedulerPriority,
   UserBlockingPriority as UserBlockingSchedulerPriority,
@@ -44,44 +40,52 @@ import {
   cancelCallback as Scheduler_cancelCallback,
   scheduleCallback as Scheduler_scheduleCallback,
   now,
-} from './Scheduler';
+} from "./Scheduler";
 import {
   DiscreteEventPriority,
   ContinuousEventPriority,
   DefaultEventPriority,
   IdleEventPriority,
   lanesToEventPriority,
-} from './ReactEventPriorities';
+} from "./ReactEventPriorities";
 import {
   supportsMicrotasks,
   scheduleMicrotask,
   shouldAttemptEagerTransition,
-} from './ReactFiberConfig';
+} from "./ReactFiberConfig";
 
-import ReactSharedInternals from 'shared/ReactSharedInternals';
-const {ReactCurrentActQueue} = ReactSharedInternals;
+import ReactSharedInternals from "shared/ReactSharedInternals";
+const { ReactCurrentActQueue } = ReactSharedInternals;
 
 // A linked list of all the roots with pending work. In an idiomatic app,
 // there's only a single root, but we do support multi root apps, hence this
 // extra complexity. But this module is optimized for the single root case.
-let firstScheduledRoot                   = null;
-let lastScheduledRoot                   = null;
+let firstScheduledRoot = null;
+let lastScheduledRoot = null;
 
 // Used to prevent redundant mircotasks from being scheduled.
-let didScheduleMicrotask          = false;
+let didScheduleMicrotask = false;
 // `act` "microtasks" are scheduled on the `act` queue instead of an actual
 // microtask, so we have to dedupe those separately. This wouldn't be an issue
 // if we required all `act` calls to be awaited, which we might in the future.
-let didScheduleMicrotask_act          = false;
+let didScheduleMicrotask_act = false;
 
 // Used to quickly bail out of flushSync if there's no sync work to do.
-let mightHavePendingSyncWork          = false;
+let mightHavePendingSyncWork = false;
 
-let isFlushingWork          = false;
+let isFlushingWork = false;
 
-let currentEventTransitionLane       = NoLane;
+let currentEventTransitionLane = NoLane;
 
-export function ensureRootIsScheduled(root           )       {
+export function ensureRootIsScheduled(root) {
+  console.log(
+    "%censureRootIsScheduled[80]",
+    "color: #FFFFFF; font-size: 14px; background: #333333;"
+  );
+  console.log("註冊調度任務，Scheduler調度，構造 fiber");
+  console.log(
+    "是否需要註冊新的調度，然後註冊一個新的調度來執行我們的Fiber生成邏輯"
+  );
   // This function is called whenever a root receives an update. It does two
   // things 1) it ensures the root is in the root schedule, and 2) it ensures
   // there's a pending microtask to process the root schedule.
@@ -105,7 +109,9 @@ export function ensureRootIsScheduled(root           )       {
   // we process the schedule. If it's false, then we can quickly exit flushSync
   // without consulting the schedule.
   mightHavePendingSyncWork = true;
-
+  console.log(
+    "產生兩類調度任務, 一個是SyncWork，另一個是ConcurrentWork，他們分別對應同步任務和可中斷任務"
+  );
   // At the end of the current event, go through each of the roots and ensure
   // there's a task scheduled for each one at the correct priority.
   if (__DEV__ && ReactCurrentActQueue.current !== null) {
@@ -126,6 +132,7 @@ export function ensureRootIsScheduled(root           )       {
     // instead of waiting a microtask.
     // TODO: We need to land enableDeferRootSchedulingToMicrotask ASAP to
     // unblock additional features we have planned.
+
     scheduleTaskForRootDuringMicrotask(root, now());
   }
 
@@ -151,7 +158,7 @@ export function flushSyncWorkOnLegacyRootsOnly() {
   flushSyncWorkAcrossRoots_impl(true);
 }
 
-function flushSyncWorkAcrossRoots_impl(onlyLegacy         ) {
+function flushSyncWorkAcrossRoots_impl(onlyLegacy) {
   if (isFlushingWork) {
     // Prevent reentrancy.
     // TODO: Is this overly defensive? The callers must check the execution
@@ -169,7 +176,7 @@ function flushSyncWorkAcrossRoots_impl(onlyLegacy         ) {
 
   // There may or may not be synchronous work scheduled. Let's check.
   let didPerformSomeWork;
-  let errors                      = null;
+  let errors = null;
   isFlushingWork = true;
   do {
     didPerformSomeWork = false;
@@ -180,7 +187,7 @@ function flushSyncWorkAcrossRoots_impl(onlyLegacy         ) {
       } else {
         const nextLanes = getNextLanes(
           root,
-          root === workInProgressRoot ? workInProgressRootRenderLanes : NoLanes,
+          root === workInProgressRoot ? workInProgressRootRenderLanes : NoLanes
         );
         if (includesSyncLane(nextLanes)) {
           // This root has pending sync work. Flush it now.
@@ -209,7 +216,7 @@ function flushSyncWorkAcrossRoots_impl(onlyLegacy         ) {
   // how/when to rethrow.
   if (errors !== null) {
     if (errors.length > 1) {
-      if (typeof AggregateError === 'function') {
+      if (typeof AggregateError === "function") {
         // eslint-disable-next-line no-undef
         throw new AggregateError(errors);
       } else {
@@ -226,7 +233,7 @@ function flushSyncWorkAcrossRoots_impl(onlyLegacy         ) {
   }
 }
 
-function throwError(error       ) {
+function throwError(error) {
   throw error;
 }
 
@@ -291,10 +298,11 @@ function processRootScheduleInMicrotask() {
   flushSyncWorkOnAllRoots();
 }
 
-function scheduleTaskForRootDuringMicrotask(
-  root           ,
-  currentTime        ,
-)       {
+function scheduleTaskForRootDuringMicrotask(root, currentTime) {
+  console.log(
+    "%cscheduleTaskForRootDuringMicrotask[294]",
+    "color: #FFFFFF; font-size: 14px; background: #333333;"
+  );
   // This function is always called inside a microtask, or at the very end of a
   // rendering task right before we yield to the main thread. It should never be
   // called synchronously.
@@ -307,6 +315,7 @@ function scheduleTaskForRootDuringMicrotask(
 
   // Check if any lanes are being starved by other work. If so, mark them as
   // expired so we know to work on those next.
+  console.log("把優先級低但是過期的任務標註為高優先級");
   markStarvedLanesAsExpired(root, currentTime);
 
   // Determine the next lanes to work on, and their priority.
@@ -314,7 +323,7 @@ function scheduleTaskForRootDuringMicrotask(
   const workInProgressRootRenderLanes = getWorkInProgressRootRenderLanes();
   const nextLanes = getNextLanes(
     root,
-    root === workInProgressRoot ? workInProgressRootRenderLanes : NoLanes,
+    root === workInProgressRoot ? workInProgressRootRenderLanes : NoLanes
   );
 
   const existingCallbackNode = root.callbackNode;
@@ -393,7 +402,7 @@ function scheduleTaskForRootDuringMicrotask(
 
     const newCallbackNode = scheduleCallback(
       schedulerPriorityLevel,
-      performConcurrentWorkOnRoot.bind(null, root),
+      performConcurrentWorkOnRoot.bind(null, root)
     );
 
     root.callbackPriority = newCallbackPriority;
@@ -402,12 +411,7 @@ function scheduleTaskForRootDuringMicrotask(
   }
 }
 
-                                                                        
-
-export function getContinuationForRoot(
-  root           ,
-  originalCallbackNode       ,
-)                      {
+export function getContinuationForRoot(root, originalCallbackNode) {
   // This is called at the end of `performConcurrentWorkOnRoot` to determine
   // if we need to schedule a continuation task.
   //
@@ -427,10 +431,7 @@ export function getContinuationForRoot(
 
 const fakeActCallbackNode = {};
 
-function scheduleCallback(
-  priorityLevel               ,
-  callback              ,
-) {
+function scheduleCallback(priorityLevel, callback) {
   if (__DEV__ && ReactCurrentActQueue.current !== null) {
     // Special case: We're inside an `act` scope (a testing utility).
     // Instead of scheduling work in the host environment, add it to a
@@ -442,7 +443,7 @@ function scheduleCallback(
   }
 }
 
-function cancelCallback(callbackNode       ) {
+function cancelCallback(callbackNode) {
   if (__DEV__ && callbackNode === fakeActCallbackNode) {
     // Special `act` case: check if this is the fake callback node used by
     // the `act` implementation.
@@ -451,7 +452,7 @@ function cancelCallback(callbackNode       ) {
   }
 }
 
-function scheduleImmediateTask(cb             ) {
+function scheduleImmediateTask(cb) {
   if (__DEV__ && ReactCurrentActQueue.current !== null) {
     // Special case: Inside an `act` scope, we push microtasks to the fake `act`
     // callback queue. This is because we currently support calling `act`
@@ -492,7 +493,7 @@ function scheduleImmediateTask(cb             ) {
   }
 }
 
-export function requestTransitionLane()       {
+export function requestTransitionLane() {
   // The algorithm for assigning an update to a lane should be stable for all
   // updates at the same priority within the same event. To do this, the
   // inputs to the algorithm must be the same.

@@ -7,8 +7,6 @@
  *       strict
  */
 
-                                                  
-
 // TODO: Use symbols?
 export const NoPriority = 0;
 export const ImmediatePriority = 1;

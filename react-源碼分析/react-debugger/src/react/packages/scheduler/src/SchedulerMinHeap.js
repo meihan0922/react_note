@@ -7,24 +7,17 @@
  *       strict
  */
 
-                              
-             
-             
-                    
-     
-  
-
-export function push         (heap         , node   )       {
+export function push(heap, node) {
   const index = heap.length;
   heap.push(node);
   siftUp(heap, node, index);
 }
 
-export function peek         (heap         )           {
+export function peek(heap) {
   return heap.length === 0 ? null : heap[0];
 }
 
-export function pop         (heap         )           {
+export function pop(heap) {
   if (heap.length === 0) {
     return null;
   }
@@ -37,7 +30,7 @@ export function pop         (heap         )           {
   return first;
 }
 
-function siftUp         (heap         , node   , i        )       {
+function siftUp(heap, node, i) {
   let index = i;
   while (index > 0) {
     const parentIndex = (index - 1) >>> 1;
@@ -54,7 +47,7 @@ function siftUp         (heap         , node   , i        )       {
   }
 }
 
-function siftDown         (heap         , node   , i        )       {
+function siftDown(heap, node, i) {
   let index = i;
   const length = heap.length;
   const halfLength = length >>> 1;
@@ -86,7 +79,7 @@ function siftDown         (heap         , node   , i        )       {
   }
 }
 
-function compare(a      , b      ) {
+function compare(a, b) {
   // Compare sort index first, then task id.
   const diff = a.sortIndex - b.sortIndex;
   return diff !== 0 ? diff : a.id - b.id;

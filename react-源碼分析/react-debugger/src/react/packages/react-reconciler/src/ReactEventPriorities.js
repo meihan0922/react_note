@@ -4,10 +4,8 @@
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  *
- *      
+ *
  */
-
-                                                  
 
 import {
   NoLane,
@@ -17,26 +15,24 @@ import {
   IdleLane,
   getHighestPriorityLane,
   includesNonIdleWork,
-} from './ReactFiberLane';
+} from "./ReactFiberLane";
 
-                                        
+export const DiscreteEventPriority = SyncLane;
+export const ContinuousEventPriority = InputContinuousLane;
+export const DefaultEventPriority = DefaultLane;
+export const IdleEventPriority = IdleLane;
 
-export const DiscreteEventPriority                = SyncLane;
-export const ContinuousEventPriority                = InputContinuousLane;
-export const DefaultEventPriority                = DefaultLane;
-export const IdleEventPriority                = IdleLane;
+let currentUpdatePriority = NoLane;
 
-let currentUpdatePriority                = NoLane;
-
-export function getCurrentUpdatePriority()                {
+export function getCurrentUpdatePriority() {
   return currentUpdatePriority;
 }
 
-export function setCurrentUpdatePriority(newPriority               ) {
+export function setCurrentUpdatePriority(newPriority) {
   currentUpdatePriority = newPriority;
 }
 
-export function runWithPriority   (priority               , fn         )    {
+export function runWithPriority(priority, fn) {
   const previousPriority = currentUpdatePriority;
   try {
     currentUpdatePriority = priority;
@@ -46,28 +42,19 @@ export function runWithPriority   (priority               , fn         )    {
   }
 }
 
-export function higherEventPriority(
-  a               ,
-  b               ,
-)                {
+export function higherEventPriority(a, b) {
   return a !== 0 && a < b ? a : b;
 }
 
-export function lowerEventPriority(
-  a               ,
-  b               ,
-)                {
+export function lowerEventPriority(a, b) {
   return a === 0 || a > b ? a : b;
 }
 
-export function isHigherEventPriority(
-  a               ,
-  b               ,
-)          {
+export function isHigherEventPriority(a, b) {
   return a !== 0 && a < b;
 }
 
-export function lanesToEventPriority(lanes       )                {
+export function lanesToEventPriority(lanes) {
   const lane = getHighestPriorityLane(lanes);
   if (!isHigherEventPriority(DiscreteEventPriority, lane)) {
     return DiscreteEventPriority;

@@ -55,6 +55,7 @@ function hasValidKey(config) {
 function defineKeyPropWarningGetter(props, displayName) {
   const warnAboutAccessingKey = function () {
     if (__DEV__) {
+      // 不重整的話，只會報一次錯，是一個 flag
       if (!specialPropKeyWarningShown) {
         specialPropKeyWarningShown = true;
         console.error(
@@ -77,6 +78,7 @@ function defineKeyPropWarningGetter(props, displayName) {
 function defineRefPropWarningGetter(props, displayName) {
   const warnAboutAccessingRef = function () {
     if (__DEV__) {
+      // 不重整的話，只會報一次錯，是一個 flag
       if (!specialPropRefWarningShown) {
         specialPropRefWarningShown = true;
         console.error(
@@ -143,7 +145,7 @@ function warnIfStringRefCannotBeAutoConverted(config) {
  */
 function ReactElement(type, key, ref, self, source, owner, props) {
   const element = {
-    // 組件的類型：Symbol 或是十六進制（看瀏覽器是否支援 Symbol 而定）
+    // 組件的類型：Symbol
     // 以此為判斷依據，只有 'react.element' 才會被渲染成真正的 DOM
     $$typeof: REACT_ELEMENT_TYPE,
 
@@ -449,6 +451,7 @@ export function createElement(type, config, children) {
   if (__DEV__) {
     // 不能在內部通過 props 取 key 或 ref 使用
     if (key || ref) {
+      // 如果是組件的話，取他的 displayName || name
       const displayName =
         typeof type === "function"
           ? type.displayName || type.name || "Unknown"

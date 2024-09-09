@@ -4,12 +4,10 @@
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  *
- *      
+ *
  */
 
 /* eslint-disable no-var */
-
-                                                          
 
 import {
   enableSchedulerDebugging,
@@ -19,9 +17,9 @@ import {
   frameYieldMs,
   continuousYieldMs,
   maxYieldMs,
-} from '../SchedulerFeatureFlags';
+} from "../SchedulerFeatureFlags";
 
-import {push, pop, peek} from '../SchedulerMinHeap';
+import { push, pop, peek } from "../SchedulerMinHeap";
 
 // TODO: Use symbols?
 import {
@@ -30,7 +28,7 @@ import {
   NormalPriority,
   LowPriority,
   IdlePriority,
-} from '../SchedulerPriorities';
+} from "../SchedulerPriorities";
 import {
   markTaskRun,
   markTaskYield,
@@ -42,24 +40,12 @@ import {
   markTaskStart,
   stopLoggingProfilingEvents,
   startLoggingProfilingEvents,
-} from '../SchedulerProfiling';
+} from "../SchedulerProfiling";
 
-                                            
-
-                           
-             
-                            
-                               
-                    
-                         
-                    
-                     
-  
-
-let getCurrentTime                                    ;
+let getCurrentTime;
 const hasPerformanceNow =
   // $FlowFixMe[method-unbinding]
-  typeof performance === 'object' && typeof performance.now === 'function';
+  typeof performance === "object" && typeof performance.now === "function";
 
 if (hasPerformanceNow) {
   const localPerformance = performance;
@@ -85,8 +71,8 @@ var LOW_PRIORITY_TIMEOUT = 10000;
 var IDLE_PRIORITY_TIMEOUT = maxSigned31BitInt;
 
 // Tasks are stored on a min heap
-var taskQueue              = [];
-var timerQueue              = [];
+var taskQueue = [];
+var timerQueue = [];
 
 // Incrementing id counter. Used to maintain insertion order.
 var taskIdCounter = 1;
@@ -104,14 +90,14 @@ var isHostCallbackScheduled = false;
 var isHostTimeoutScheduled = false;
 
 // Capture local references to native APIs, in case a polyfill overrides them.
-const localSetTimeout = typeof setTimeout === 'function' ? setTimeout : null;
+const localSetTimeout = typeof setTimeout === "function" ? setTimeout : null;
 const localClearTimeout =
-  typeof clearTimeout === 'function' ? clearTimeout : null;
+  typeof clearTimeout === "function" ? clearTimeout : null;
 const localSetImmediate =
-  typeof setImmediate !== 'undefined' ? setImmediate : null; // IE and Node.js + jsdom
+  typeof setImmediate !== "undefined" ? setImmediate : null; // IE and Node.js + jsdom
 
 const isInputPending =
-  typeof navigator !== 'undefined' &&
+  typeof navigator !== "undefined" &&
   // $FlowFixMe[prop-missing]
   navigator.scheduling !== undefined &&
   // $FlowFixMe[incompatible-type]
@@ -119,9 +105,9 @@ const isInputPending =
     ? navigator.scheduling.isInputPending.bind(navigator.scheduling)
     : null;
 
-const continuousOptions = {includeContinuous: enableIsInputPendingContinuous};
+const continuousOptions = { includeContinuous: enableIsInputPendingContinuous };
 
-function advanceTimers(currentTime        ) {
+function advanceTimers(currentTime) {
   // Check for tasks that are no longer delayed and add them to the queue.
   let timer = peek(timerQueue);
   while (timer !== null) {
@@ -145,7 +131,7 @@ function advanceTimers(currentTime        ) {
   }
 }
 
-function handleTimeout(currentTime        ) {
+function handleTimeout(currentTime) {
   isHostTimeoutScheduled = false;
   advanceTimers(currentTime);
 
@@ -162,7 +148,7 @@ function handleTimeout(currentTime        ) {
   }
 }
 
-function flushWork(initialTime        ) {
+function flushWork(initialTime) {
   if (enableProfiling) {
     markSchedulerUnsuspended(initialTime);
   }
@@ -206,7 +192,7 @@ function flushWork(initialTime        ) {
   }
 }
 
-function workLoop(initialTime        ) {
+function workLoop(initialTime) {
   let currentTime = initialTime;
   advanceTimers(currentTime);
   currentTask = peek(taskQueue);
@@ -220,7 +206,7 @@ function workLoop(initialTime        ) {
     }
     // $FlowFixMe[incompatible-use] found when upgrading Flow
     const callback = currentTask.callback;
-    if (typeof callback === 'function') {
+    if (typeof callback === "function") {
       // $FlowFixMe[incompatible-use] found when upgrading Flow
       currentTask.callback = null;
       // $FlowFixMe[incompatible-use] found when upgrading Flow
@@ -233,7 +219,7 @@ function workLoop(initialTime        ) {
       }
       const continuationCallback = callback(didUserCallbackTimeout);
       currentTime = getCurrentTime();
-      if (typeof continuationCallback === 'function') {
+      if (typeof continuationCallback === "function") {
         // If a continuation is returned, immediately yield to the main thread
         // regardless of how much time is left in the current time slice.
         // $FlowFixMe[incompatible-use] found when upgrading Flow
@@ -273,10 +259,7 @@ function workLoop(initialTime        ) {
   }
 }
 
-function unstable_runWithPriority   (
-  priorityLevel               ,
-  eventHandler         ,
-)    {
+function unstable_runWithPriority(priorityLevel, eventHandler) {
   switch (priorityLevel) {
     case ImmediatePriority:
     case UserBlockingPriority:
@@ -298,7 +281,7 @@ function unstable_runWithPriority   (
   }
 }
 
-function unstable_next   (eventHandler         )    {
+function unstable_next(eventHandler) {
   var priorityLevel;
   switch (currentPriorityLevel) {
     case ImmediatePriority:
@@ -323,7 +306,7 @@ function unstable_next   (eventHandler         )    {
   }
 }
 
-function unstable_wrapCallback                               (callback   )    {
+function unstable_wrapCallback(callback) {
   var parentPriorityLevel = currentPriorityLevel;
   // $FlowFixMe[incompatible-return]
   // $FlowFixMe[missing-this-annot]
@@ -340,17 +323,13 @@ function unstable_wrapCallback                               (callback   )    {
   };
 }
 
-function unstable_scheduleCallback(
-  priorityLevel               ,
-  callback          ,
-  options                  ,
-)       {
+function unstable_scheduleCallback(priorityLevel, callback, options) {
   var currentTime = getCurrentTime();
 
   var startTime;
-  if (typeof options === 'object' && options !== null) {
+  if (typeof options === "object" && options !== null) {
     var delay = options.delay;
-    if (typeof delay === 'number' && delay > 0) {
+    if (typeof delay === "number" && delay > 0) {
       startTime = currentTime + delay;
     } else {
       startTime = currentTime;
@@ -381,7 +360,7 @@ function unstable_scheduleCallback(
 
   var expirationTime = startTime + timeout;
 
-  var newTask       = {
+  var newTask = {
     id: taskIdCounter++,
     callback,
     priorityLevel,
@@ -438,11 +417,11 @@ function unstable_continueExecution() {
   }
 }
 
-function unstable_getFirstCallbackNode()              {
+function unstable_getFirstCallbackNode() {
   return peek(taskQueue);
 }
 
-function unstable_cancelCallback(task      ) {
+function unstable_cancelCallback(task) {
   if (enableProfiling) {
     if (task.isQueued) {
       const currentTime = getCurrentTime();
@@ -457,12 +436,12 @@ function unstable_cancelCallback(task      ) {
   task.callback = null;
 }
 
-function unstable_getCurrentPriorityLevel()                {
+function unstable_getCurrentPriorityLevel() {
   return currentPriorityLevel;
 }
 
 let isMessageLoopRunning = false;
-let taskTimeoutID            = (-1     );
+let taskTimeoutID = -1;
 
 // Scheduler periodically yields in case there is other work on the main
 // thread, like user events. By default, it yields multiple times per frame.
@@ -475,7 +454,7 @@ let startTime = -1;
 
 let needsPaint = false;
 
-function shouldYieldToHost()          {
+function shouldYieldToHost() {
   const timeElapsed = getCurrentTime() - startTime;
   if (timeElapsed < frameInterval) {
     // The main thread has only been blocked for a really short amount of time;
@@ -535,12 +514,12 @@ function requestPaint() {
   // Since we yield every frame regardless, `requestPaint` has no effect.
 }
 
-function forceFrameRate(fps        ) {
+function forceFrameRate(fps) {
   if (fps < 0 || fps > 125) {
     // Using console['error'] to evade Babel and ESLint
-    console['error'](
-      'forceFrameRate takes a positive int between 0 and 125, ' +
-        'forcing frame rates higher than 125 fps is not supported',
+    console["error"](
+      "forceFrameRate takes a positive int between 0 and 125, " +
+        "forcing frame rates higher than 125 fps is not supported"
     );
     return;
   }
@@ -584,7 +563,7 @@ const performWorkUntilDeadline = () => {
 };
 
 let schedulePerformWorkUntilDeadline;
-if (typeof localSetImmediate === 'function') {
+if (typeof localSetImmediate === "function") {
   // Node.js and old IE.
   // There's a few reasons for why we prefer setImmediate.
   //
@@ -599,7 +578,7 @@ if (typeof localSetImmediate === 'function') {
   schedulePerformWorkUntilDeadline = () => {
     localSetImmediate(performWorkUntilDeadline);
   };
-} else if (typeof MessageChannel !== 'undefined') {
+} else if (typeof MessageChannel !== "undefined") {
   // DOM and Worker environments.
   // We prefer MessageChannel because of the 4ms setTimeout clamping.
   const channel = new MessageChannel();
@@ -616,17 +595,14 @@ if (typeof localSetImmediate === 'function') {
   };
 }
 
-function requestHostCallback(callback                                  ) {
+function requestHostCallback(callback) {
   if (!isMessageLoopRunning) {
     isMessageLoopRunning = true;
     schedulePerformWorkUntilDeadline();
   }
 }
 
-function requestHostTimeout(
-  callback                               ,
-  ms        ,
-) {
+function requestHostTimeout(callback, ms) {
   // $FlowFixMe[not-a-function] nullable value
   taskTimeoutID = localSetTimeout(() => {
     callback(getCurrentTime());
@@ -636,7 +612,7 @@ function requestHostTimeout(
 function cancelHostTimeout() {
   // $FlowFixMe[not-a-function] nullable value
   localClearTimeout(taskTimeoutID);
-  taskTimeoutID = ((-1     )           );
+  taskTimeoutID = -1;
 }
 
 export {
@@ -660,10 +636,7 @@ export {
   forceFrameRate as unstable_forceFrameRate,
 };
 
-export const unstable_Profiling   
-                                      
-                                                   
-         = enableProfiling
+export const unstable_Profiling = enableProfiling
   ? {
       startLoggingProfilingEvents,
       stopLoggingProfilingEvents,

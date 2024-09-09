@@ -4,7 +4,7 @@
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  *
- *      
+ *
  */
 
 // UpdateQueue is a linked list of prioritized updates.
@@ -84,9 +84,6 @@
 // regardless of priority. Intermediate state may vary according to system
 // resources, but the final state is always the same.
 
-                                                           
-                                                  
-
 import {
   NoLane,
   NoLanes,
@@ -97,58 +94,34 @@ import {
   isTransitionLane,
   intersectLanes,
   markRootEntangled,
-} from './ReactFiberLane';
+} from "./ReactFiberLane";
 import {
   enterDisallowedContextReadInDEV,
   exitDisallowedContextReadInDEV,
-} from './ReactFiberNewContext';
+} from "./ReactFiberNewContext";
 import {
   Callback,
   Visibility,
   ShouldCapture,
   DidCapture,
-} from './ReactFiberFlags';
-import getComponentNameFromFiber from './getComponentNameFromFiber';
+} from "./ReactFiberFlags";
+import getComponentNameFromFiber from "./getComponentNameFromFiber";
 
-import {debugRenderPhaseSideEffectsForStrictMode} from 'shared/ReactFeatureFlags';
+import { debugRenderPhaseSideEffectsForStrictMode } from "shared/ReactFeatureFlags";
 
-import {StrictLegacyMode} from './ReactTypeOfMode';
+import { StrictLegacyMode } from "./ReactTypeOfMode";
 import {
   markSkippedUpdateLanes,
   isUnsafeClassRenderPhaseUpdate,
   getWorkInProgressRootRenderLanes,
-} from './ReactFiberWorkLoop';
+} from "./ReactFiberWorkLoop";
 import {
   enqueueConcurrentClassUpdate,
   unsafe_markUpdateLaneFromFiberToRoot,
-} from './ReactFiberConcurrentUpdates';
-import {setIsStrictModeForDevtools} from './ReactFiberDevToolsHook';
+} from "./ReactFiberConcurrentUpdates";
+import { setIsStrictModeForDevtools } from "./ReactFiberDevToolsHook";
 
-import assign from 'shared/assign';
-
-                             
-             
-
-                     
-               
-                                 
-
-                             
-  
-
-                                  
-                                
-               
-                                             
-  
-
-                                  
-                   
-                                        
-                                       
-                             
-                                       
-  
+import assign from "shared/assign";
 
 export const UpdateState = 0;
 export const ReplaceState = 1;
@@ -161,8 +134,8 @@ export const CaptureUpdate = 3;
 let hasForceUpdate = false;
 
 let didWarnUpdateInsideUpdate;
-let currentlyProcessingQueue                          ;
-export let resetCurrentlyProcessingQueue            ;
+let currentlyProcessingQueue;
+export let resetCurrentlyProcessingQueue;
 if (__DEV__) {
   didWarnUpdateInsideUpdate = false;
   currentlyProcessingQueue = null;
@@ -171,14 +144,22 @@ if (__DEV__) {
   };
 }
 
-export function initializeUpdateQueue       (fiber       )       {
-  const queue                     = {
+// 初始化 `fiber.updateQueue`，在 beginWork 階段，updateHostRoot 中使用 processUpdateQueue 再具體賦值
+export function initializeUpdateQueue(fiber) {
+  const queue = {
     baseState: fiber.memoizedState,
+    // 單鏈表的解構 會一路指向 lastBaseUpdate
     firstBaseUpdate: null,
+    // 只是為了快速比較兩個單鏈表
     lastBaseUpdate: null,
     shared: {
-      pending: null,
-      lanes: NoLanes,
+      pending: null, // 正在掛載的更新，單向循環鏈表
+      lanes: NoLanes, // Lanes
+      /**
+       * 如果類組件是 Activity(以前叫做offScreen)的後代組件，
+       * 需要延遲執行期 setState 的 callback，
+       * 這裡只是先暫時收集，commit 階段提交，
+       */
       hiddenCallbacks: null,
     },
     callbacks: null,
@@ -186,15 +167,12 @@ export function initializeUpdateQueue       (fiber       )       {
   fiber.updateQueue = queue;
 }
 
-export function cloneUpdateQueue       (
-  current       ,
-  workInProgress       ,
-)       {
+export function cloneUpdateQueue(current, workInProgress) {
   // Clone the update queue from current. Unless it's already a clone.
-  const queue                     = (workInProgress.updateQueue     );
-  const currentQueue                     = (current.updateQueue     );
+  const queue = workInProgress.updateQueue;
+  const currentQueue = current.updateQueue;
   if (queue === currentQueue) {
-    const clone                     = {
+    const clone = {
       baseState: currentQueue.baseState,
       firstBaseUpdate: currentQueue.firstBaseUpdate,
       lastBaseUpdate: currentQueue.lastBaseUpdate,
@@ -205,31 +183,24 @@ export function cloneUpdateQueue       (
   }
 }
 
-export function createUpdate(lane      )                {
-  const update                = {
+export function createUpdate(lane) {
+  const update = {
     lane,
-
     tag: UpdateState,
     payload: null,
     callback: null,
-
     next: null,
   };
   return update;
 }
 
-export function enqueueUpdate       (
-  fiber       ,
-  update               ,
-  lane      ,
-)                   {
+export function enqueueUpdate(fiber, update, lane) {
   const updateQueue = fiber.updateQueue;
   if (updateQueue === null) {
     // Only occurs if the fiber has been unmounted.
     return null;
   }
-
-  const sharedQueue                     = (updateQueue     ).shared;
+  const sharedQueue = updateQueue.shared;
 
   if (__DEV__) {
     if (
@@ -238,11 +209,11 @@ export function enqueueUpdate       (
     ) {
       const componentName = getComponentNameFromFiber(fiber);
       console.error(
-        'An update (setState, replaceState, or forceUpdate) was scheduled ' +
-          'from inside an update function. Update functions should be pure, ' +
-          'with zero side-effects. Consider using componentDidUpdate or a ' +
-          'callback.\n\nPlease update the following component: %s',
-        componentName,
+        "An update (setState, replaceState, or forceUpdate) was scheduled " +
+          "from inside an update function. Update functions should be pure, " +
+          "with zero side-effects. Consider using componentDidUpdate or a " +
+          "callback.\n\nPlease update the following component: %s",
+        componentName
       );
       didWarnUpdateInsideUpdate = true;
     }
@@ -271,14 +242,14 @@ export function enqueueUpdate       (
   }
 }
 
-export function entangleTransitions(root           , fiber       , lane      ) {
+export function entangleTransitions(root, fiber, lane) {
   const updateQueue = fiber.updateQueue;
   if (updateQueue === null) {
     // Only occurs if the fiber has been unmounted.
     return;
   }
 
-  const sharedQueue                     = (updateQueue     ).shared;
+  const sharedQueue = updateQueue.shared;
   if (isTransitionLane(lane)) {
     let queueLanes = sharedQueue.lanes;
 
@@ -299,19 +270,16 @@ export function entangleTransitions(root           , fiber       , lane      ) {
   }
 }
 
-export function enqueueCapturedUpdate       (
-  workInProgress       ,
-  capturedUpdate               ,
-) {
+export function enqueueCapturedUpdate(workInProgress, capturedUpdate) {
   // Captured updates are updates that are thrown by a child during the render
   // phase. They should be discarded if the render is aborted. Therefore,
   // we should only put them on the work-in-progress queue, not the current one.
-  let queue                     = (workInProgress.updateQueue     );
+  let queue = workInProgress.updateQueue;
 
   // Check if the work-in-progress queue is a clone.
   const current = workInProgress.alternate;
   if (current !== null) {
-    const currentQueue                     = (current.updateQueue     );
+    const currentQueue = current.updateQueue;
     if (queue === currentQueue) {
       // The work-in-progress queue is the same as current. This happens when
       // we bail out on a parent fiber that then captures an error thrown by
@@ -324,9 +292,9 @@ export function enqueueCapturedUpdate       (
       const firstBaseUpdate = queue.firstBaseUpdate;
       if (firstBaseUpdate !== null) {
         // Loop through the updates and clone them.
-        let update                = firstBaseUpdate;
+        let update = firstBaseUpdate;
         do {
-          const clone                = {
+          const clone = {
             lane: update.lane,
 
             tag: update.tag,
@@ -380,18 +348,18 @@ export function enqueueCapturedUpdate       (
   queue.lastBaseUpdate = capturedUpdate;
 }
 
-function getStateFromUpdate       (
-  workInProgress       ,
-  queue                    ,
-  update               ,
-  prevState       ,
-  nextProps     ,
-  instance     ,
-)      {
+function getStateFromUpdate(
+  workInProgress,
+  queue,
+  update,
+  prevState,
+  nextProps,
+  instance
+) {
   switch (update.tag) {
     case ReplaceState: {
       const payload = update.payload;
-      if (typeof payload === 'function') {
+      if (typeof payload === "function") {
         // Updater function
         if (__DEV__) {
           enterDisallowedContextReadInDEV();
@@ -424,7 +392,7 @@ function getStateFromUpdate       (
     case UpdateState: {
       const payload = update.payload;
       let partialState;
-      if (typeof payload === 'function') {
+      if (typeof payload === "function") {
         // Updater function
         if (__DEV__) {
           enterDisallowedContextReadInDEV();
@@ -463,14 +431,22 @@ function getStateFromUpdate       (
   return prevState;
 }
 
-export function processUpdateQueue       (
-  workInProgress       ,
-  props     ,
-  instance     ,
-  renderLanes       ,
-)       {
+export function processUpdateQueue(
+  workInProgress,
+  props,
+  instance,
+  renderLanes
+) {
+  console.log(
+    "%cprocessUpdateQueue[436]",
+    "color: #FFFFFF; font-size: 14px; background: #333333;"
+  );
+  console.log("處理pending update，把他們轉移到 baseQueue");
+  console.log(
+    "pending update是單向循環鏈表，firstBaseUpdate, lastBaseUpdate 不是"
+  );
   // This is always non-null on a ClassComponent or HostRoot
-  const queue                     = (workInProgress.updateQueue     );
+  const queue = workInProgress.updateQueue;
 
   hasForceUpdate = false;
 
@@ -478,10 +454,12 @@ export function processUpdateQueue       (
     currentlyProcessingQueue = queue.shared;
   }
 
+  // 獲取上次還沒渲染的隊列
   let firstBaseUpdate = queue.firstBaseUpdate;
   let lastBaseUpdate = queue.lastBaseUpdate;
 
   // Check if there are pending updates. If so, transfer them to the base queue.
+  // ! 獲取當前的隊列
   let pendingQueue = queue.shared.pending;
   if (pendingQueue !== null) {
     queue.shared.pending = null;
@@ -490,13 +468,17 @@ export function processUpdateQueue       (
     // and last so that it's non-circular.
     const lastPendingUpdate = pendingQueue;
     const firstPendingUpdate = lastPendingUpdate.next;
+    // ! 斷開循環鏈表
     lastPendingUpdate.next = null;
     // Append pending updates to base queue
+    // 如果尾隊列是空，表示整個隊列都是空的，把新的當前隊列塞入
     if (lastBaseUpdate === null) {
       firstBaseUpdate = firstPendingUpdate;
     } else {
+      // 把新的隊列放入尾節點的後面，拼接起來
       lastBaseUpdate.next = firstPendingUpdate;
     }
+    // 指向到最末端
     lastBaseUpdate = lastPendingUpdate;
 
     // If there's a current queue, and it's different from the base queue, then
@@ -505,10 +487,12 @@ export function processUpdateQueue       (
     // lists and take advantage of structural sharing.
     // TODO: Pass `current` as argument
     const current = workInProgress.alternate;
+    // 如果兩棵樹對應的節點已經存在的話
     if (current !== null) {
       // This is always non-null on a ClassComponent or HostRoot
-      const currentQueue                     = (current.updateQueue     );
+      const currentQueue = current.updateQueue;
       const currentLastBaseUpdate = currentQueue.lastBaseUpdate;
+      // 如果當前的樹的更新鏈表最後的節點比對 新的樹的尾節點 不一樣，則將新的鏈表拼接到當前的樹中
       if (currentLastBaseUpdate !== lastBaseUpdate) {
         if (currentLastBaseUpdate === null) {
           currentQueue.firstBaseUpdate = firstPendingUpdate;
@@ -530,9 +514,10 @@ export function processUpdateQueue       (
 
     let newBaseState = null;
     let newFirstBaseUpdate = null;
-    let newLastBaseUpdate                       = null;
+    let newLastBaseUpdate = null;
 
-    let update                = firstBaseUpdate;
+    let update = firstBaseUpdate;
+    // 鏈表的循環處理
     do {
       // An extra OffscreenLane bit is added to updates that were made to
       // a hidden tree, so that we can distinguish them from updates that were
@@ -548,10 +533,11 @@ export function processUpdateQueue       (
         : !isSubsetOfLanes(renderLanes, updateLane);
 
       if (shouldSkipUpdate) {
+        // 判斷當前的 update lane 滿足更新優先級條件嗎？否，則把 update 存起來
         // Priority is insufficient. Skip this update. If this is the first
         // skipped update, the previous update/state is the new base
         // update/state.
-        const clone                = {
+        const clone = {
           lane: updateLane,
 
           tag: update.tag,
@@ -562,17 +548,20 @@ export function processUpdateQueue       (
         };
         if (newLastBaseUpdate === null) {
           newFirstBaseUpdate = newLastBaseUpdate = clone;
+          // 有 update 延遲了，把 state 保存起來
           newBaseState = newState;
         } else {
           newLastBaseUpdate = newLastBaseUpdate.next = clone;
         }
         // Update the remaining priority in the queue.
+        // 更新 lane， 他下次遍歷到時才能執行
         newLanes = mergeLanes(newLanes, updateLane);
       } else {
         // This update does have sufficient priority.
 
         if (newLastBaseUpdate !== null) {
-          const clone                = {
+          // 如果前面有 update 被延遲了，後面所有任務都必須進入到被延遲的隊列中
+          const clone = {
             // This update is going to be committed so we never want uncommit
             // it. Using NoLane works because 0 is a subset of all bitmasks, so
             // this will never be skipped by the check above.
@@ -590,6 +579,7 @@ export function processUpdateQueue       (
           newLastBaseUpdate = newLastBaseUpdate.next = clone;
         }
 
+        console.log("遍歷 queue，根據update計算出最後結果newState");
         // Process this update.
         newState = getStateFromUpdate(
           workInProgress,
@@ -597,10 +587,11 @@ export function processUpdateQueue       (
           update,
           newState,
           props,
-          instance,
+          instance
         );
         const callback = update.callback;
         if (callback !== null) {
+          // 標記當前 fiber 有 callback
           workInProgress.flags |= Callback;
           if (isHiddenUpdate) {
             workInProgress.flags |= Visibility;
@@ -620,13 +611,13 @@ export function processUpdateQueue       (
         if (pendingQueue === null) {
           break;
         } else {
+          // 當前的 queue 處理完後，queue.shared.pending可能會有新的更新，如果有就把新的放進來繼續處理
           // An update was scheduled from inside a reducer. Add the new
           // pending updates to the end of the list and keep processing.
           const lastPendingUpdate = pendingQueue;
           // Intentionally unsound. Pending updates form a circular list, but we
           // unravel them when transferring them to the base queue.
-          const firstPendingUpdate =
-            ((lastPendingUpdate.next     )               );
+          const firstPendingUpdate = lastPendingUpdate.next;
           lastPendingUpdate.next = null;
           update = firstPendingUpdate;
           queue.lastBaseUpdate = lastPendingUpdate;
@@ -639,7 +630,8 @@ export function processUpdateQueue       (
       newBaseState = newState;
     }
 
-    queue.baseState = ((newBaseState     )       );
+    queue.baseState = newBaseState;
+    // 保存延遲的 update
     queue.firstBaseUpdate = newFirstBaseUpdate;
     queue.lastBaseUpdate = newLastBaseUpdate;
 
@@ -658,6 +650,7 @@ export function processUpdateQueue       (
     // that regardless.
     markSkippedUpdateLanes(newLanes);
     workInProgress.lanes = newLanes;
+    console.log("把newState掛到workInProgress.memoizedState");
     workInProgress.memoizedState = newState;
   }
 
@@ -666,11 +659,11 @@ export function processUpdateQueue       (
   }
 }
 
-function callCallback(callback             , context     ) {
-  if (typeof callback !== 'function') {
+function callCallback(callback, context) {
+  if (typeof callback !== "function") {
     throw new Error(
-      'Invalid argument passed as callback. Expected a function. Instead ' +
-        `received: ${callback}`,
+      "Invalid argument passed as callback. Expected a function. Instead " +
+        `received: ${callback}`
     );
   }
 
@@ -681,13 +674,11 @@ export function resetHasForceUpdateBeforeProcessing() {
   hasForceUpdate = false;
 }
 
-export function checkHasForceUpdateAfterProcessing()          {
+export function checkHasForceUpdateAfterProcessing() {
   return hasForceUpdate;
 }
 
-export function deferHiddenCallbacks       (
-  updateQueue                    ,
-)       {
+export function deferHiddenCallbacks(updateQueue) {
   // When an update finishes on a hidden component, its callback should not
   // be fired until/unless the component is made visible again. Stash the
   // callback on the shared queue object so it can be fired later.
@@ -703,10 +694,7 @@ export function deferHiddenCallbacks       (
   }
 }
 
-export function commitHiddenCallbacks       (
-  updateQueue                    ,
-  context     ,
-)       {
+export function commitHiddenCallbacks(updateQueue, context) {
   // This component is switching from hidden -> visible. Commit any callbacks
   // that were previously deferred.
   const hiddenCallbacks = updateQueue.shared.hiddenCallbacks;
@@ -719,10 +707,7 @@ export function commitHiddenCallbacks       (
   }
 }
 
-export function commitCallbacks       (
-  updateQueue                    ,
-  context     ,
-)       {
+export function commitCallbacks(updateQueue, context) {
   const callbacks = updateQueue.callbacks;
   if (callbacks !== null) {
     updateQueue.callbacks = null;

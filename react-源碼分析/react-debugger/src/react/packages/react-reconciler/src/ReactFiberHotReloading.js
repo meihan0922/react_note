@@ -4,26 +4,21 @@
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  *
- *      
+ *
  */
 
 /* eslint-disable react-internal/prod-error-codes */
 
-                                                          
-                                                           
-                                                 
-                                                     
-
-import {enableHostSingletons, enableFloat} from 'shared/ReactFeatureFlags';
+import { enableHostSingletons, enableFloat } from "shared/ReactFeatureFlags";
 import {
   flushSync,
   scheduleUpdateOnFiber,
   flushPassiveEffects,
-} from './ReactFiberWorkLoop';
-import {enqueueConcurrentRenderForLane} from './ReactFiberConcurrentUpdates';
-import {updateContainer} from './ReactFiberReconciler';
-import {emptyContextObject} from './ReactFiberContext';
-import {SyncLane} from './ReactFiberLane';
+} from "./ReactFiberWorkLoop";
+import { enqueueConcurrentRenderForLane } from "./ReactFiberConcurrentUpdates";
+import { updateContainer } from "./ReactFiberReconciler";
+import { emptyContextObject } from "./ReactFiberContext";
+import { SyncLane } from "./ReactFiberLane";
 import {
   ClassComponent,
   FunctionComponent,
@@ -35,45 +30,28 @@ import {
   HostRoot,
   MemoComponent,
   SimpleMemoComponent,
-} from './ReactWorkTags';
+} from "./ReactWorkTags";
 import {
   REACT_FORWARD_REF_TYPE,
   REACT_MEMO_TYPE,
   REACT_LAZY_TYPE,
-} from 'shared/ReactSymbols';
-import {supportsSingletons} from './ReactFiberConfig';
-
-                      
-               
-  
-
-                             
-                             
-                               
-  
+} from "shared/ReactSymbols";
+import { supportsSingletons } from "./ReactFiberConfig";
 
 // Resolves type to a family.
-                                           
 
 // Used by React Refresh runtime through DevTools Global Hook.
-                                                                         
-                                                                               
-                                                                             
-                                           
-                  
-                          
-                   
 
-let resolveFamily                        = null;
-let failedBoundaries                        = null;
+let resolveFamily = null;
+let failedBoundaries = null;
 
-export const setRefreshHandler = (handler                       )       => {
+export const setRefreshHandler = (handler) => {
   if (__DEV__) {
     resolveFamily = handler;
   }
 };
 
-export function resolveFunctionForHotReloading(type     )      {
+export function resolveFunctionForHotReloading(type) {
   if (__DEV__) {
     if (resolveFamily === null) {
       // Hot reloading is disabled.
@@ -90,12 +68,12 @@ export function resolveFunctionForHotReloading(type     )      {
   }
 }
 
-export function resolveClassForHotReloading(type     )      {
+export function resolveClassForHotReloading(type) {
   // No implementation differences.
   return resolveFunctionForHotReloading(type);
 }
 
-export function resolveForwardRefForHotReloading(type     )      {
+export function resolveForwardRefForHotReloading(type) {
   if (__DEV__) {
     if (resolveFamily === null) {
       // Hot reloading is disabled.
@@ -107,7 +85,7 @@ export function resolveForwardRefForHotReloading(type     )      {
       if (
         type !== null &&
         type !== undefined &&
-        typeof type.render === 'function'
+        typeof type.render === "function"
       ) {
         // ForwardRef is special because its resolved .type is an object,
         // but it's possible that we only have its inner render function in the map.
@@ -119,7 +97,7 @@ export function resolveForwardRefForHotReloading(type     )      {
             render: currentRender,
           };
           if (type.displayName !== undefined) {
-            (syntheticType     ).displayName = type.displayName;
+            syntheticType.displayName = type.displayName;
           }
           return syntheticType;
         }
@@ -133,10 +111,7 @@ export function resolveForwardRefForHotReloading(type     )      {
   }
 }
 
-export function isCompatibleFamilyForHotReloading(
-  fiber       ,
-  element              ,
-)          {
+export function isCompatibleFamilyForHotReloading(fiber, element) {
   if (__DEV__) {
     if (resolveFamily === null) {
       // Hot reloading is disabled.
@@ -150,19 +125,19 @@ export function isCompatibleFamilyForHotReloading(
     let needsCompareFamilies = false;
 
     const $$typeofNextType =
-      typeof nextType === 'object' && nextType !== null
+      typeof nextType === "object" && nextType !== null
         ? nextType.$$typeof
         : null;
 
     switch (fiber.tag) {
       case ClassComponent: {
-        if (typeof nextType === 'function') {
+        if (typeof nextType === "function") {
           needsCompareFamilies = true;
         }
         break;
       }
       case FunctionComponent: {
-        if (typeof nextType === 'function') {
+        if (typeof nextType === "function") {
           needsCompareFamilies = true;
         } else if ($$typeofNextType === REACT_LAZY_TYPE) {
           // We don't know the inner type yet.
@@ -215,13 +190,13 @@ export function isCompatibleFamilyForHotReloading(
   }
 }
 
-export function markFailedErrorBoundaryForHotReloading(fiber       ) {
+export function markFailedErrorBoundaryForHotReloading(fiber) {
   if (__DEV__) {
     if (resolveFamily === null) {
       // Hot reloading is disabled.
       return;
     }
-    if (typeof WeakSet !== 'function') {
+    if (typeof WeakSet !== "function") {
       return;
     }
     if (failedBoundaries === null) {
@@ -231,31 +206,25 @@ export function markFailedErrorBoundaryForHotReloading(fiber       ) {
   }
 }
 
-export const scheduleRefresh                  = (
-  root           ,
-  update               ,
-)       => {
+export const scheduleRefresh = (root, update) => {
   if (__DEV__) {
     if (resolveFamily === null) {
       // Hot reloading is disabled.
       return;
     }
-    const {staleFamilies, updatedFamilies} = update;
+    const { staleFamilies, updatedFamilies } = update;
     flushPassiveEffects();
     flushSync(() => {
       scheduleFibersWithFamiliesRecursively(
         root.current,
         updatedFamilies,
-        staleFamilies,
+        staleFamilies
       );
     });
   }
 };
 
-export const scheduleRoot               = (
-  root           ,
-  element               ,
-)       => {
+export const scheduleRoot = (root, element) => {
   if (__DEV__) {
     if (root.context !== emptyContextObject) {
       // Super edge case: root has a legacy _renderSubtree context
@@ -271,12 +240,12 @@ export const scheduleRoot               = (
 };
 
 function scheduleFibersWithFamiliesRecursively(
-  fiber       ,
-  updatedFamilies             ,
-  staleFamilies             ,
-)       {
+  fiber,
+  updatedFamilies,
+  staleFamilies
+) {
   if (__DEV__) {
-    const {alternate, child, sibling, tag, type} = fiber;
+    const { alternate, child, sibling, tag, type } = fiber;
 
     let candidateType = null;
     switch (tag) {
@@ -293,7 +262,7 @@ function scheduleFibersWithFamiliesRecursively(
     }
 
     if (resolveFamily === null) {
-      throw new Error('Expected resolveFamily to be set during hot reload.');
+      throw new Error("Expected resolveFamily to be set during hot reload.");
     }
 
     let needsRender = false;
@@ -335,46 +304,43 @@ function scheduleFibersWithFamiliesRecursively(
       scheduleFibersWithFamiliesRecursively(
         child,
         updatedFamilies,
-        staleFamilies,
+        staleFamilies
       );
     }
     if (sibling !== null) {
       scheduleFibersWithFamiliesRecursively(
         sibling,
         updatedFamilies,
-        staleFamilies,
+        staleFamilies
       );
     }
   }
 }
 
-export const findHostInstancesForRefresh                              = (
-  root           ,
-  families               ,
-)                => {
+export const findHostInstancesForRefresh = (root, families) => {
   if (__DEV__) {
-    const hostInstances = new Set          ();
-    const types = new Set(families.map(family => family.current));
+    const hostInstances = new Set();
+    const types = new Set(families.map((family) => family.current));
     findHostInstancesForMatchingFibersRecursively(
       root.current,
       types,
-      hostInstances,
+      hostInstances
     );
     return hostInstances;
   } else {
     throw new Error(
-      'Did not expect findHostInstancesForRefresh to be called in production.',
+      "Did not expect findHostInstancesForRefresh to be called in production."
     );
   }
 };
 
 function findHostInstancesForMatchingFibersRecursively(
-  fiber       ,
-  types          ,
-  hostInstances               ,
+  fiber,
+  types,
+  hostInstances
 ) {
   if (__DEV__) {
-    const {child, sibling, tag, type} = fiber;
+    const { child, sibling, tag, type } = fiber;
 
     let candidateType = null;
     switch (tag) {
@@ -408,7 +374,7 @@ function findHostInstancesForMatchingFibersRecursively(
         findHostInstancesForMatchingFibersRecursively(
           child,
           types,
-          hostInstances,
+          hostInstances
         );
       }
     }
@@ -417,20 +383,17 @@ function findHostInstancesForMatchingFibersRecursively(
       findHostInstancesForMatchingFibersRecursively(
         sibling,
         types,
-        hostInstances,
+        hostInstances
       );
     }
   }
 }
 
-function findHostInstancesForFiberShallowly(
-  fiber       ,
-  hostInstances               ,
-)       {
+function findHostInstancesForFiberShallowly(fiber, hostInstances) {
   if (__DEV__) {
     const foundHostInstances = findChildHostInstancesForFiberShallowly(
       fiber,
-      hostInstances,
+      hostInstances
     );
     if (foundHostInstances) {
       return;
@@ -451,19 +414,16 @@ function findHostInstancesForFiberShallowly(
           return;
       }
       if (node.return === null) {
-        throw new Error('Expected to reach root first.');
+        throw new Error("Expected to reach root first.");
       }
       node = node.return;
     }
   }
 }
 
-function findChildHostInstancesForFiberShallowly(
-  fiber       ,
-  hostInstances               ,
-)          {
+function findChildHostInstancesForFiberShallowly(fiber, hostInstances) {
   if (__DEV__) {
-    let node        = fiber;
+    let node = fiber;
     let foundHostInstances = false;
     while (true) {
       if (
