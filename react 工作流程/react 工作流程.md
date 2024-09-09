@@ -1,10 +1,12 @@
 - [react 工作流程](#react-工作流程)
+  - [Virtual DOM](#virtual-dom)
   - [react 的架構](#react-的架構)
     - [調度層 Scheduler](#調度層-scheduler)
     - [協調層 Reconciler](#協調層-reconciler)
     - [渲染層 Renderer](#渲染層-renderer)
   - [從 react element 到 fiber tree](#從-react-element-到-fiber-tree)
   - [更新的本質](#更新的本質)
+  - [時間切片 time slice](#時間切片-time-slice)
   - [工作過程](#工作過程)
     - [雙緩存 fiber tree](#雙緩存-fiber-tree)
     - [創建更新 tree](#創建更新-tree)
@@ -31,9 +33,16 @@
 
 # react 工作流程
 
+### Virtual DOM
+
+是一種編成概念，由 React 在 2013 率先開拓，後續被許多不同的框架採用。
+在這個概念裡面，UI 以一種理想化的，或者說是虛擬的形式被保存在內存中，通過 ReactDOM 等套件包轉換成 fiber 結構後，使它跟真的的 DOM 同步。同步的過程在 react 當中稱之為調和或是協調 Reconcile。而協調的核心就是 VDOM diff 算法。
+
+用物件表現 DOM 的信息和結構，當狀態變更時，重新渲染這個物件結構（VDOM)
+
 重點整理：
 
-1. babel 轉譯 jsx -> createElement() -> react element -> fiber tree -> dom tree
+1. jsx -> react element -> fiber tree -> dom tree
 2. 更新發生調和 同時存在兩顆樹，新的樹會取代舊的樹，發生變化的 node 會標記 effect ，v17 之前調和完成後 以單鏈表的結構收集，順序為子節點、子節點兄弟節點、父節點，但性能問題加上內存管理不好，就使用一種新的數據結構 effectList 雙向鏈表來標記
 3. 如果組件沒有執行 render，就是直接複用舊樹節點，除此之外要經過 diff 算法 來判斷是要克隆還是創建
 4. diff 算法是比較已經匹配的父節點的子節點，不會跨父節點比較
@@ -62,9 +71,13 @@ v15 原先協調器和渲染器交替工作，找出差異就更新。v16 中，
 
 ### 從 react element 到 fiber tree
 
-jsx 經過 babel 後，轉譯為 `React.createElement`，執行後返回 **AST 抽象語法樹**，再轉換成 **fiber tree**，對應到 **dom tree**，==在構建 tree 的過程中以二叉樹中序遍歷的方式，從 child 延伸，直到 child 完成後尋找 return 指向 ，再找 sibling 指向。==
+v17 之前，jsx 經過 babel 後，轉譯為 `React.createElement`。v17 之後，和 babel 進行了合作，使用 babel 進行上述的處理，所以在 React17.0 我們不用引入 React 也可以運行我們的 jsx，自動從套件包中引入新的入口函式調用。
+
+執行後返回 **AST 抽象語法樹**，再轉換成 **fiber tree**，對應到 **dom tree**，==在構建 tree 的過程中以二叉樹中序遍歷的方式，從 child 延伸，直到 child 完成後尋找 return 指向 ，再找 sibling 指向。==
 首屏渲染完成後，進入交互更新階段。
 更新時會產生兩個 **fiber tree**，一棵是對應當前顯示，一個是對應更新將要顯示 **workInProgress fiber tree**，更新完成後 即替換掉舊的。
+
+> fiber? 不是 React 獨有的，是一種常見的術語，在 Ruby, PHP 中都有應用。可中斷可暫停。React v16 引入了 fiber 的協調引擎(Incremental rendering)，目的是使 VDOM 可以進行增量式渲染，將渲染拆分多塊，分散在不同幀處理。支持暫停和終止複用工作任務(work)，給不同任務賦予優先級，給併發提供基礎，更好的支持錯誤邊界。
 
 ```js
 // 二叉樹中序遍歷
@@ -200,6 +213,29 @@ react 內部將一次更新分為兩個階段，**render**、**commit**。
 
 - **render**: 對 fiber tree 做更新操作，收集更新過程中產生的副作用
 - **commit**: 處理 render 階段收得的副作用
+
+### 時間切片 time slice
+
+在單線程的機制下，如果一個任務執行時間花費過久，就會堵塞後面的任務。
+react 渲染時，**高優先級的任務（ex: 交互、佈局）被某個任務堵塞了**，螢幕就會出現卡頓。為了解決這種問題，react 操照操作系統，引入了時間切片的機制，**在某個時間段內週期性執行任務，週期性地把控制權交還給瀏覽器。**
+
+![stackReconciler](./assets/stackReconciler.jpeg)
+![fiberReconciler](./assets/workloop.webp)
+
+每個 work 工作單元的時長是 5ms，超過執行時間，就要把控制權交還給瀏覽器
+
+```js
+// 偽代碼
+// 時間切片的起始，時間戳
+let startTime = -1;
+// 時間切片，這是個時間段
+let frameInterval = 5;
+
+function shouldYieldToHost() {
+  const timeElapsed = performance.now() - startTime;
+  return timeElapsed >= frameInterval;
+}
+```
 
 ### 工作過程
 
@@ -535,7 +571,7 @@ React 為什麼選擇使用 MessageChannel 來實現類似 requestIdleCallback �
    requestIdleCallback 在所有瀏覽器中的支持情況不一樣，特別是在一些舊版瀏覽器或不支持這個 API 的環境下，React 希望能在不同的環境中保持一致的行為。使用 MessageChannel 可以提供更一致的跨瀏覽器行為。
 
 2. <u>精細控制和穩定性</u>：
-   MessageChannel 和 postMessage 使得 React 可以更精確地控制執行時機，並且在任務調度中提供更高的穩定性。在某些情況下 requestIdleCallback 可能無法如預期工作，或者在特定環境下表現不如預期。
+   **呼叫的間隔不穩定，因特定的裝置效能和目前的瀏覽器任務而異，呼叫的頻率太低了，據說有網友檢查到只有 20 次/每秒**。MessageChannel 和 postMessage 使得 React 可以更精確地控制執行時機，並且在任務調度中提供更高的穩定性。
 
 3. <u>更高的控制權</u>：
    使用 MessageChannel 使得 React 團隊可以完全掌控任務的調度過程。他們可以自行決定如何處理閒置時間，而不需要依賴瀏覽器的實現。這有助於 React 更好地優化性能和用戶體驗。
